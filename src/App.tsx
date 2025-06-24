@@ -1,86 +1,118 @@
-import { useState } from "react";
-import { uploadToS3, invokeBedrockAPI } from "./awsClient";
+import { useState } from 'react';
+import {
+  Container,
+  TextField,
+  Button,
+  Typography,
+  Box,
+  CircularProgress,
+  Paper,
+  Stack,
+} from '@mui/material';
+import { uploadToS3, invokeBedrockAPI } from './awsClient';
 
-function App() {
-  const [prompt, setPrompt] = useState("");
-  const [preview, setPreview] = useState("");
-  const [status, setStatus] = useState("");
+const defaultPrompt =
+  'A modern, responsive website for a freelance graphic designer showcasing portfolio, services, and a contact form';
+
+export default function App() {
+  const [prompt, setPrompt] = useState(defaultPrompt);
+  const [preview, setPreview] = useState('');
+  const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const generateSite = async () => {
-    setStatus("Generating...");
+    setStatus('Generating...');
+    setLoading(true);
     try {
       const res = await invokeBedrockAPI(prompt);
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Generation failed");
+      if (!res.ok) throw new Error(data?.error || 'Generation failed');
       setPreview(data.html);
-      setStatus("Generated successfully");
-    } catch (err) {
+      setStatus('Generated successfully');
+    } catch (err: any) {
       console.error(err);
-      setStatus("Generation failed");
+      setStatus('Generation failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDeploy = async () => {
+    setStatus('Uploading...');
     try {
-      setStatus("Uploading...");
       const location = await uploadToS3(preview);
       setStatus(`Deployed: ${location}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setStatus("Upload failed");
+      setStatus('Upload failed');
     }
   };
 
   return (
-    <div style={{ padding: "2rem", fontFamily: "sans-serif" }}>
-      <h2>AI Website Generator</h2>
-      <textarea
-        placeholder="e.g. A modern, responsive website for a freelance graphic designer showcasing portfolio, services, and a contact form"
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        AI Website Generator by Maze
+      </Typography>
+
+      <TextField
+        fullWidth
+        multiline
+        minRows={4}
+        label="Prompt"
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        rows={4}
-        style={{ width: "100%", padding: "0.5rem", fontSize: "1rem" }}
+        sx={{ mb: 2 }}
       />
-      <br />
-      <button onClick={generateSite} style={{ marginRight: "1rem", marginTop: "1rem" }}>
-        Generate
-      </button>
-      <button onClick={handleDeploy} disabled={!preview} style={{ marginTop: "1rem" }}>
-        Deploy to S3
-      </button>
-      <p>Status: {status}</p>
 
-      {!preview ? (
-        <div
-          style={{
-            width: "100%",
-            height: "500px",
-            marginTop: "1rem",
-            border: "1px solid #ccc",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "#fafafa",
-            color: "#777",
-            fontStyle: "italic",
-          }}
+      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+        <Button
+          variant="contained"
+          onClick={generateSite}
+          disabled={loading || !prompt.trim()}
         >
-          Website preview will appear here after generation
-        </div>
-      ) : (
-        <iframe
-          title="Preview"
-          srcDoc={preview}
-          style={{
-            width: "100%",
-            height: "500px",
-            marginTop: "1rem",
-            border: "1px solid #ccc",
-          }}
-        />
-      )}
-    </div>
+          {loading ? <CircularProgress size={24} /> : 'Generate'}
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={handleDeploy}
+          disabled={!preview}
+        >
+          Deploy to S3
+        </Button>
+      </Stack>
+
+      <Typography variant="body1" sx={{ mb: 2 }}>
+        Status: {status}
+      </Typography>
+
+      <Paper
+        variant="outlined"
+        sx={{
+          height: '500px',
+          p: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          bgcolor: '#fafafa',
+        }}
+      >
+        {preview ? (
+          <iframe
+            title="Website Preview"
+            srcDoc={preview}
+            style={{ width: '100%', height: '100%', border: 'none' }}
+          />
+        ) : (
+          <Typography
+            variant="body1"
+            color="textSecondary"
+            sx={{ fontStyle: 'italic' }}
+          >
+            Website preview will appear here after generation
+          </Typography>
+        )}
+      </Paper>
+    </Container>
   );
 }
-
-export default App;
