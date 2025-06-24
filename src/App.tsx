@@ -4,7 +4,6 @@ import {
   TextField,
   Button,
   Typography,
-  Box,
   CircularProgress,
   Paper,
   Stack,
@@ -48,10 +47,23 @@ export default function App() {
     }
   };
 
+  const downloadHTML = () => {
+    const blob = new Blob([preview], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'website.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
       <Typography variant="h4" gutterBottom>
-        AI Website Generator by Maze
+        AI Website Generator by MAZE
       </Typography>
 
       <TextField
@@ -78,6 +90,13 @@ export default function App() {
           disabled={!preview}
         >
           Deploy to S3
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={downloadHTML}
+          disabled={!preview}
+        >
+          Download HTML
         </Button>
       </Stack>
 
