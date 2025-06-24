@@ -63,7 +63,7 @@ export default function App() {
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
       <Typography variant="h4" gutterBottom>
-        AI Website Generator by MAZE
+        AI Website Generator by Maze
       </Typography>
 
       <TextField
