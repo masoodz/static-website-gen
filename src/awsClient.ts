@@ -61,7 +61,6 @@ export const checkStatus = async (sessionId: string): Promise<string | null> => 
   });
 
   const signedRequest = await signer.sign(request);
-  console.log("Signed GET headers:", signedRequest.headers);
 
   const response = await fetch(fullUrl, {
     method: "GET",
@@ -73,9 +72,8 @@ export const checkStatus = async (sessionId: string): Promise<string | null> => 
     return null;
   }
 
-  const { html } = await response.json();
-  return html ?? null;
+  const data = await response.json();
+  return data.url ?? null;
 };
-
 export const generateSessionId = (): string =>
   `web-${Math.random().toString(36).substring(2, 10)}`;

@@ -7,6 +7,7 @@ import {
   CircularProgress,
   Paper,
   Stack,
+  Link,
 } from "@mui/material";
 import { invokeBedrockAPI, checkStatus, generateSessionId } from "./awsClient";
 
@@ -15,55 +16,42 @@ const defaultPrompt =
 
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
-  const [preview, setPreview] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
-  
+  const [s3Url, setS3Url] = useState("");
   const pollingRef = useRef<number | null>(null);
 
   const pollUntilReady = async (id: string) => {
     setStatus("Waiting for HTML...");
     pollingRef.current = setInterval(async () => {
-      const html = await checkStatus(id);
-      if (html) {
+      const url = await checkStatus(id);
+      if (url) {
         clearInterval(pollingRef.current!);
-        setPreview(html);
+        setS3Url(url);
         setStatus("Generated successfully");
         setLoading(false);
       } else {
         console.log("Still pending...");
       }
-    }, 20000);
+    }, 10000);
   };
 
   const generateSite = async () => {
-  const id = generateSessionId();
-  setStatus("Submitting to Bedrock...");
-  setLoading(true);
-  try {
-    const res = await invokeBedrockAPI(prompt, id);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error || "Generation failed");
-    setStatus("Generation started...");
-    pollUntilReady(id);
-  } catch (err: any) {
-    console.error(err);
-    setStatus("Generation failed");
-    setLoading(false);
-  }
-};
-
-
-  const downloadHTML = () => {
-    const blob = new Blob([preview], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "website.html";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const id = generateSessionId();
+    setStatus("Submitting to Bedrock...");
+    setLoading(true);
+    setS3Url("");
+    try {
+      const res = await invokeBedrockAPI(prompt, id);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Generation failed");
+      setStatus("Generation started...");
+      pollUntilReady(id);
+    } catch (err: any) {
+      console.error(err);
+      setStatus("Generation failed");
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -96,15 +84,20 @@ export default function App() {
         >
           {loading ? <CircularProgress size={24} /> : "Generate"}
         </Button>
-
-        <Button variant="outlined" onClick={downloadHTML} disabled={!preview}>
-          Download HTML
-        </Button>
       </Stack>
 
-      <Typography variant="body1" sx={{ mb: 2 }}>
+      <Typography variant="body1" sx={{ mb: 1 }}>
         Status: {status}
       </Typography>
+
+      {s3Url && (
+        <Typography variant="body2" sx={{ mb: 2 }}>
+          Public Link:{" "}
+          <Link href={s3Url} target="_blank" rel="noopener noreferrer">
+            {s3Url}
+          </Link>
+        </Typography>
+      )}
 
       <Paper
         variant="outlined"
@@ -118,10 +111,10 @@ export default function App() {
           bgcolor: "#fafafa",
         }}
       >
-        {preview ? (
+        {s3Url ? (
           <iframe
             title="Website Preview"
-            srcDoc={preview}
+            src={s3Url}
             style={{ width: "100%", height: "100%", border: "none" }}
           />
         ) : (
