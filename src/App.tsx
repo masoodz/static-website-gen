@@ -7,7 +7,8 @@ import {
   CircularProgress,
   Paper,
   Stack,
-  Link,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import { invokeBedrockAPI, checkStatus, generateSessionId } from "./awsClient";
 
@@ -16,31 +17,36 @@ const defaultPrompt =
 
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
+  const [preview, setPreview] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
-  const [s3Url, setS3Url] = useState("");
+  const [html, setHtml] = useState("");
+  const [viewRaw, setViewRaw] = useState(false);
+
   const pollingRef = useRef<number | null>(null);
 
   const pollUntilReady = async (id: string) => {
     setStatus("Waiting for HTML...");
     pollingRef.current = setInterval(async () => {
-      const url = await checkStatus(id);
-      if (url) {
+      const result = await checkStatus(id);
+      if (result) {
         clearInterval(pollingRef.current!);
-        setS3Url(url);
+        const res = await fetch(result);
+        const text = await res.text();
+        setHtml(text);
+        setPreview(result);
         setStatus("Generated successfully");
         setLoading(false);
       } else {
         console.log("Still pending...");
       }
-    }, 10000);
+    }, 20000);
   };
 
   const generateSite = async () => {
     const id = generateSessionId();
     setStatus("Submitting to Bedrock...");
     setLoading(true);
-    setS3Url("");
     try {
       const res = await invokeBedrockAPI(prompt, id);
       const data = await res.json();
@@ -63,7 +69,7 @@ export default function App() {
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
       <Typography variant="h4" gutterBottom>
-        AI Website Generator by Maze
+        AI Website Generator
       </Typography>
 
       <TextField
@@ -86,37 +92,53 @@ export default function App() {
         </Button>
       </Stack>
 
-      <Typography variant="body1" sx={{ mb: 1 }}>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={viewRaw}
+            onChange={() => setViewRaw((prev) => !prev)}
+            disabled={!html && status !== "Generated successfully"}
+          />
+        }
+        label="View Raw HTML"
+      />
+
+      <Typography variant="body1" sx={{ mb: 2 }}>
         Status: {status}
       </Typography>
-
-      {s3Url && (
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          Public Link:{" "}
-          <Link href={s3Url} target="_blank" rel="noopener noreferrer">
-            {s3Url}
-          </Link>
-        </Typography>
-      )}
 
       <Paper
         variant="outlined"
         sx={{
           height: "500px",
           p: 1,
-          overflow: "hidden",
+          overflow: "auto",
           display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
+          flexDirection: "column",
           bgcolor: "#fafafa",
         }}
       >
-        {s3Url ? (
-          <iframe
-            title="Website Preview"
-            src={s3Url}
-            style={{ width: "100%", height: "100%", border: "none" }}
-          />
+        {preview ? (
+          viewRaw ? (
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                overflow: "auto",
+                fontSize: "0.85rem",
+                padding: "8px",
+                margin: 0,
+                flex: 1,
+              }}
+            >
+              {html}
+            </pre>
+          ) : (
+            <iframe
+              title="Website Preview"
+              src={preview}
+              style={{ width: "100%", height: "100%", border: "none" }}
+            />
+          )
         ) : (
           <Typography
             variant="body1"
