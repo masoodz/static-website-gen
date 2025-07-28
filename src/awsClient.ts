@@ -3,10 +3,10 @@ import { SignatureV4 } from "@aws-sdk/signature-v4";
 import { Sha256 } from "@aws-crypto/sha256-js";
 import { HttpRequest } from "@aws-sdk/protocol-http";
 
-const REGION = "us-east-1";
-const API_URL = "https://12qmaamafi.execute-api.us-east-1.amazonaws.com/prod/generate";
-const STATUS_API_URL = "https://12qmaamafi.execute-api.us-east-1.amazonaws.com/prod/status";
-const IDENTITY_POOL_ID = "us-east-1:18da943d-b375-43ac-b23a-15d5b0bd878b";
+const REGION = import.meta.env.VITE_REGION!;
+const API_URL = import.meta.env.VITE_API_URL!;
+const STATUS_API_URL = import.meta.env.VITE_STATUS_API_URL!;
+const IDENTITY_POOL_ID = import.meta.env.VITE_IDENTITY_POOL_ID!;
 
 const credentials = fromCognitoIdentityPool({
   identityPoolId: IDENTITY_POOL_ID,
