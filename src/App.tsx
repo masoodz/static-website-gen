@@ -19,7 +19,7 @@ export default function App() {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<number | null>(null);
 
   const pollUntilReady = async (id: string) => {
     setStatus("Waiting for HTML...");
