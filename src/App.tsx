@@ -22,6 +22,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [html, setHtml] = useState("");
   const [viewRaw, setViewRaw] = useState(false);
+  const [sessionId, setSessionId] = useState("");
 
   const pollingRef = useRef<number | null>(null);
 
@@ -40,11 +41,12 @@ export default function App() {
       } else {
         console.log("Still pending...");
       }
-    }, 5000); // 5 second interval
+    }, 5000); // 5-second interval
   };
 
   const generateSite = async () => {
-    const id = generateSessionId();
+    const id = sessionId || generateSessionId(); // reuse session if exists
+    setSessionId(id);
     setStatus("Submitting to Bedrock...");
     setLoading(true);
     setHtml("");
@@ -90,9 +92,32 @@ export default function App() {
           onClick={generateSite}
           disabled={loading || !prompt.trim()}
         >
-          {loading ? <CircularProgress size={24} /> : "Generate"}
+          {loading ? (
+            <CircularProgress size={24} />
+          ) : sessionId ? (
+            "Update Site"
+          ) : (
+            "Generate"
+          )}
         </Button>
       </Stack>
+
+      {sessionId && (
+        <Typography variant="caption" sx={{ mb: 1 }}>
+          Session ID: {sessionId}
+        </Typography>
+      )}
+
+      {preview && (
+        <>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Deployed URL:{" "}
+            <a href={preview} target="_blank" rel="noopener noreferrer">
+              {preview}
+            </a>
+          </Typography>
+        </>
+      )}
 
       <FormControlLabel
         control={
@@ -108,24 +133,6 @@ export default function App() {
       <Typography variant="body1" sx={{ mb: 1 }}>
         Status: {status}
       </Typography>
-
-      {preview && (
-        <>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            Deployed URL:{" "}
-            <a href={preview} target="_blank" rel="noopener noreferrer">
-              {preview}
-            </a>
-          </Typography>
-          <Button
-            variant="outlined"
-            sx={{ mb: 2 }}
-            onClick={() => window.open(preview, "_blank")}
-          >
-            View Full Page
-          </Button>
-        </>
-      )}
 
       <Paper
         variant="outlined"
