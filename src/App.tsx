@@ -40,13 +40,15 @@ export default function App() {
       } else {
         console.log("Still pending...");
       }
-    }, 20000);
+    }, 5000); // 5 second interval
   };
 
   const generateSite = async () => {
     const id = generateSessionId();
     setStatus("Submitting to Bedrock...");
     setLoading(true);
+    setHtml("");
+    setPreview("");
     try {
       const res = await invokeBedrockAPI(prompt, id);
       const data = await res.json();
@@ -67,7 +69,7 @@ export default function App() {
   }, []);
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
+    <Container maxWidth="lg" sx={{ mt: 4 }}>
       <Typography variant="h4" gutterBottom>
         AI Website Generator
       </Typography>
@@ -103,14 +105,33 @@ export default function App() {
         label="View Raw HTML"
       />
 
-      <Typography variant="body1" sx={{ mb: 2 }}>
+      <Typography variant="body1" sx={{ mb: 1 }}>
         Status: {status}
       </Typography>
+
+      {preview && (
+        <>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Deployed URL:{" "}
+            <a href={preview} target="_blank" rel="noopener noreferrer">
+              {preview}
+            </a>
+          </Typography>
+          <Button
+            variant="outlined"
+            sx={{ mb: 2 }}
+            onClick={() => window.open(preview, "_blank")}
+          >
+            View Full Page
+          </Button>
+        </>
+      )}
 
       <Paper
         variant="outlined"
         sx={{
-          height: "500px",
+          width: "100%",
+          height: "calc(100vh - 300px)",
           p: 1,
           overflow: "auto",
           display: "flex",
