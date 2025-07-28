@@ -3,76 +3,79 @@ import { SignatureV4 } from "@aws-sdk/signature-v4";
 import { Sha256 } from "@aws-crypto/sha256-js";
 import { HttpRequest } from "@aws-sdk/protocol-http";
 
-
 const REGION = "us-east-1";
-const API_URL = import.meta.env.VITE_API_URL!;
-const IDENTITY_POOL_ID = import.meta.env.VITE_IDENTITY_POOL_ID!;
+const API_URL = "https://12qmaamafi.execute-api.us-east-1.amazonaws.com/prod/generate";
+const STATUS_API_URL = "https://12qmaamafi.execute-api.us-east-1.amazonaws.com/prod/status";
+const IDENTITY_POOL_ID = "us-east-1:18da943d-b375-43ac-b23a-15d5b0bd878b";
 
 const credentials = fromCognitoIdentityPool({
   identityPoolId: IDENTITY_POOL_ID,
-  clientConfig: { region: REGION }
+  clientConfig: { region: REGION },
 });
 
-export const invokeBedrockAPI = async (prompt: string): Promise<Response> => {
-  const creds = await credentials();
-  const signer = new SignatureV4({
-    credentials: creds,
-    service: "execute-api",
-    region: REGION,
-    sha256: Sha256,
-  });
+const signer = new SignatureV4({
+  credentials,
+  service: "execute-api",
+  region: REGION,
+  sha256: Sha256,
+});
+
+export const invokeBedrockAPI = async (prompt: string, sessionId: string): Promise<Response> => {
+  const url = new URL(API_URL);
 
   const request = new HttpRequest({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      host: new URL(API_URL).host,
+      host: url.host,
     },
-    body: JSON.stringify({
-      prompt,
-      sessionId: "web-guest",
-    }),
-    hostname: new URL(API_URL).host,
-    path: new URL(API_URL).pathname,
+    body: JSON.stringify({ prompt, sessionId }),
+    hostname: url.hostname,
+    path: url.pathname,
+    protocol: url.protocol,
   });
 
   const signedRequest = await signer.sign(request);
+  console.log("Signed headers:", signedRequest.headers);
 
-  const res = await fetch(API_URL, {
+  return fetch(API_URL, {
     method: "POST",
     headers: signedRequest.headers,
     body: request.body,
   });
-
-  return res;
 };
 
+export const checkStatus = async (sessionId: string): Promise<string | null> => {
+  const fullUrl = `${STATUS_API_URL}?sessionId=${encodeURIComponent(sessionId)}`;
+  const url = new URL(fullUrl);
 
-
-export const uploadToS3 = async (htmlContent: string) => {
-  const filename = "websites/web-guest/index.html";
-
-  const response = await fetch(import.meta.env.VITE_PRESIGN_API!, {
-    method: "POST",
+  const request = new HttpRequest({
+    method: "GET",
     headers: {
-      "Content-Type": "application/json",
+      host: url.host,
     },
-    body: JSON.stringify({ key: filename }),
+    hostname: url.hostname,
+    path: url.pathname,
+    query: { sessionId },
+    protocol: url.protocol,
   });
 
-  if (!response.ok) throw new Error("Failed to get pre-signed URL");
+  const signedRequest = await signer.sign(request);
+  console.log("Signed GET headers:", signedRequest.headers);
 
-  const { url } = await response.json();
-
-  const upload = await fetch(url, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "text/html",
-    },
-    body: htmlContent,
+  const response = await fetch(fullUrl, {
+    method: "GET",
+    headers: signedRequest.headers,
   });
 
-  if (!upload.ok) throw new Error("Upload failed");
+  if (!response.ok) {
+    console.error("Failed to fetch status:", response.status, await response.text());
+    return null;
+  }
 
-  return url.split("?")[0]; // Return clean S3 URL
+  const { html } = await response.json();
+  return html ?? null;
 };
+
+export const generateSessionId = (): string =>
+  `web-${Math.random().toString(36).substring(2, 10)}`;
