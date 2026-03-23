@@ -1,109 +1,138 @@
-# AI Site Generator (Frontend)
+# AI Site Generator — Frontend
 
-A modern React + Vite web application for generating AI-powered HTML websites. Users provide a prompt, and the app interfaces with AWS services to deliver a responsive, styled site — viewable in-browser and hosted on S3.
+React + Vite frontend for the AI site generator.
+Submit a prompt, watch the agent work in real time,
+get a live hosted URL.
+
+Live demo: https://sitegendemo.zubairmasood.com
+
 
 ---
 
-## 🚀 Features
+## What it does
 
-- ✨ Prompt-driven AI HTML generation
-- 🧠 Integration with AWS Bedrock (via backend)
-- 🔐 Secure API Gateway calls using Cognito Identity Pools (IAM auth)
-- 🧾 S3-hosted site previews with live iframe + public link
-- 🧱 Fully typed with TypeScript
-- 🎨 UI built with Material UI (MUI)
+Sends a natural language prompt to a serverless
+backend, then polls for progress as an agentic
+Claude pipeline structures the page, generates
+a hero image with Nova Canvas, and deploys the
+final HTML to S3.
 
----
+The UI reflects real backend state as it happens:
+- Page structure designed (25%)
+- Hero image preview appears (60%)
+- Full site loads in iframe (100%)
 
-## 📦 Technologies Used
-
-- [React](https://react.dev/)
-- [Vite](https://vitejs.dev/)
-- [AWS SDK v3](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/)
-- [Cognito Identity Pool](https://docs.aws.amazon.com/cognito/latest/developerguide/identity-pools.html)
-- [Amazon S3](https://aws.amazon.com/s3/)
-- [API Gateway + Lambda (IAM auth)](https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html)
-- [Material UI](https://mui.com/)
+Progress is real, not simulated. Each stage
+corresponds to an actual tool call completing
+in the backend agentic loop.
 
 ---
 
-## ⚙️ Setup Instructions
+## Stack
 
-### 1. Clone the repo
+React, Vite, TypeScript, Material UI,
+AWS SDK v3 (SigV4 request signing),
+Cognito Identity Pool (unauthenticated IAM auth)
 
+---
 
-### 2. Install dependencies
+## How the polling works
 
+After submitting a prompt the app polls
+/status?sessionId=xxx every 3 seconds.
+
+The backend returns one of five states:
+```typescript
+{ "status": "pending" }
+// status.json not written yet, generation starting
+
+{ "stage": "structure_created", "progress": 25,
+  "message": "Page structure designed" }
+// Claude called create_html_structure tool
+
+{ "stage": "image_generated", "progress": 60,
+  "heroImageUrl": "https://...hero.png" }
+// Claude called generate_image, Nova Canvas complete
+
+{ "stage": "complete", "progress": 100,
+  "siteUrl": "https://...site.html" }
+// Claude called deploy_to_s3, site is live
+
+{ "stage": "error", "progress": 0,
+  "message": "specific error" }
+// Agent loop failed, error written to S3
+```
+
+The hero image URL arrives at 60% and renders
+as a preview before the full site is ready.
+This gives the user real AI output about 25
+seconds into a 100 second generation.
+
+---
+
+## Security
+
+All API calls are signed with AWS Signature v4
+using temporary credentials from Cognito Identity
+Pool. No API keys exist in the frontend code.
+
+CORS on the backend is permissive because security
+is enforced at the IAM auth layer, not the CORS
+layer. This is intentional.
+
+---
+
+## Running locally
 ```bash
 npm install
 ```
 
-### 3. Set environment variables
-
-Create a `.env` file in the root of the project with the following values:
-
-```env
+Create .env:
+```
 VITE_REGION=us-east-1
 VITE_API_URL=https://your-api-id.execute-api.us-east-1.amazonaws.com/prod/generate
 VITE_STATUS_API_URL=https://your-api-id.execute-api.us-east-1.amazonaws.com/prod/status
-VITE_IDENTITY_POOL_ID=us-east-1:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_IDENTITY_POOL_ID=us-east-1:xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
-> Make sure your Identity Pool allows unauthenticated access and is attached to a role with `execute-api:Invoke` permissions.
-
-### 4. Start the app locally
-
+Your Cognito Identity Pool must allow unauthenticated
+access with a role that has execute-api:Invoke
+permission.
 ```bash
 npm run dev
 ```
 
-Visit [http://localhost:5173](http://localhost:5173)
+Visit http://localhost:5173
 
 ---
 
-## 🧪 Testing
+## Deploying
 
-- After clicking **Generate**, the app securely signs and sends a prompt to the backend.
-- It polls the status endpoint every 10 seconds until the HTML is ready.
-- The response S3 URL is rendered via an iframe and shared as a public link.
-
----
-
-## 📁 Project Structure
-
-```
-src/
-├── App.tsx               # Main React component
-├── awsClient.ts          # AWS request signing and API call logic
-├── main.tsx              # React DOM rendering entry point
-├── vite-env.d.ts         # Vite's type definitions
-└── styles/, components/  # (optional) UI or style files
-```
-
----
-
-## 🔐 Security Notes
-
-- All API calls are signed via AWS Signature v4 using Cognito Identity Pool credentials.
-- Only users with access to the Identity Pool (unauth or auth) can invoke the API Gateway endpoint.
-- S3 bucket serves public HTML files after generation, optionally customizable with private access + presigned URLs.
-
----
-
-## 🛠️ Build for Production
-
+Deployed via AWS Amplify connected to this repo.
+Push to main triggers a build automatically.
 ```bash
-npm run build
-```
-
-Preview the production build:
-
-```bash
-npm run preview
+npm run build   # output in dist/
+npm run preview # preview production build locally
 ```
 
 ---
 
-## 📜 License
+## What I would do differently at production scale
+
+- Add user authentication so generations are
+  tied to accounts with history
+- WebSocket connection instead of polling so
+  progress arrives without repeated HTTP calls
+- Stream Claude's thinking text during generation
+  so users see the reasoning, not just the stages
+- Rate limiting per user to manage Bedrock costs
+- The polling interval is 3 seconds which is
+  reasonable but still creates up to 3 seconds
+  of lag between a stage completing and the UI
+  updating
+
+---
+
+## License
 
 MIT
