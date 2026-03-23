@@ -1,16 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import {
+  Box,
   Container,
   TextField,
   Button,
   Typography,
   CircularProgress,
+  LinearProgress,
   Paper,
   Stack,
   FormControlLabel,
   Switch,
 } from "@mui/material";
 import { invokeBedrockAPI, checkStatus, generateSessionId } from "./awsClient";
+import type { GenerationStatus } from "./awsClient";
 
 const defaultPrompt =
   "A modern, responsive website for a freelance graphic designer showcasing portfolio, services, and a contact form";
@@ -23,25 +26,71 @@ export default function App() {
   const [html, setHtml] = useState("");
   const [viewRaw, setViewRaw] = useState(false);
   const [sessionId, setSessionId] = useState("");
+  const [progress, setProgress] = useState<number>(0);
+  const [statusMessage, setStatusMessage] = useState<string>("");
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const pollingRef = useRef<number | null>(null);
+  const heroImageUrlRef = useRef<string | null>(null);
 
   const pollUntilReady = async (id: string) => {
     setStatus("Waiting for HTML...");
     pollingRef.current = setInterval(async () => {
-      const result = await checkStatus(id);
-      if (result) {
+      const data: GenerationStatus | null = await checkStatus(id);
+      if (!data) {
+        console.log("Still pending...");
+        return;
+      }
+
+      // Handle error stage
+      if (data.stage === 'error') {
+        setError(data.message || 'Generation failed');
+        setStatus("Generation failed");
+        setLoading(false);
         clearInterval(pollingRef.current!);
-        const res = await fetch(result);
+        return;
+      }
+
+      // Handle complete — new shape
+      if (data.stage === 'complete' && data.siteUrl) {
+        const res = await fetch(data.siteUrl);
         const text = await res.text();
         setHtml(text);
-        setPreview(result);
+        setPreview(data.siteUrl);
+        setProgress(100);
+        setStatusMessage('Your site is ready');
         setStatus("Generated successfully");
         setLoading(false);
-      } else {
-        console.log("Still pending...");
+        clearInterval(pollingRef.current!);
+        return;
       }
-    }, 5000); // 5-second interval
+
+      // Handle legacy complete shape (backwards compatibility)
+      if (data.status === 'ready' && data.url) {
+        const res = await fetch(data.url);
+        const text = await res.text();
+        setHtml(text);
+        setPreview(data.url);
+        setProgress(100);
+        setStatus("Generated successfully");
+        setLoading(false);
+        clearInterval(pollingRef.current!);
+        return;
+      }
+
+      // Handle intermediate progress stages
+      if (data.progress) {
+        setProgress(data.progress);
+      }
+      if (data.message) {
+        setStatusMessage(data.message);
+      }
+      if (data.heroImageUrl && !heroImageUrlRef.current) {
+        heroImageUrlRef.current = data.heroImageUrl;
+        setHeroImageUrl(data.heroImageUrl);
+      }
+    }, 5000);
   };
 
   const generateSite = async () => {
@@ -51,6 +100,11 @@ export default function App() {
     setLoading(true);
     setHtml("");
     setPreview("");
+    setProgress(0);
+    setStatusMessage("");
+    setHeroImageUrl(null);
+    heroImageUrlRef.current = null;
+    setError(null);
     try {
       const res = await invokeBedrockAPI(prompt, id);
       const data = await res.json();
@@ -130,9 +184,63 @@ export default function App() {
         label="View Raw HTML"
       />
 
-      <Typography variant="body1" sx={{ mb: 1 }}>
-        Status: {status}
-      </Typography>
+      {error && (
+        <Typography variant="body1" color="error" sx={{ mb: 1 }}>
+          Error: {error}
+        </Typography>
+      )}
+
+      {!loading && status && (
+        <Typography variant="body1" sx={{ mb: 1 }}>
+          Status: {status}
+        </Typography>
+      )}
+
+      {loading && (
+        <Box sx={{ mt: 1, mb: 2, width: '100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+            <LinearProgress
+              variant={progress > 0 ? 'determinate' : 'indeterminate'}
+              value={progress}
+              sx={{ flexGrow: 1, height: 8, borderRadius: 4 }}
+            />
+            {progress > 0 && (
+              <Typography variant="caption" sx={{ minWidth: 35 }}>
+                {progress}%
+              </Typography>
+            )}
+          </Box>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 2, minHeight: 20 }}
+          >
+            {statusMessage || 'Starting generation...'}
+          </Typography>
+          {heroImageUrl && (
+            <Box sx={{ mt: 2 }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mb: 1 }}
+              >
+                Hero image preview
+              </Typography>
+              <Box
+                component="img"
+                src={heroImageUrl}
+                alt="Generated hero image"
+                sx={{
+                  width: '100%',
+                  borderRadius: 2,
+                  maxHeight: 300,
+                  objectFit: 'cover',
+                }}
+              />
+            </Box>
+          )}
+        </Box>
+      )}
 
       <Paper
         variant="outlined"

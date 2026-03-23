@@ -45,7 +45,20 @@ export const invokeBedrockAPI = async (prompt: string, sessionId: string): Promi
   });
 };
 
-export const checkStatus = async (sessionId: string): Promise<string | null> => {
+export interface GenerationStatus {
+  // Legacy pending response
+  status?: 'pending' | 'ready'
+  url?: string
+
+  // New progress response
+  stage?: 'structure_created' | 'image_generated' | 'complete' | 'error'
+  progress?: number
+  message?: string
+  heroImageUrl?: string
+  siteUrl?: string
+}
+
+export const checkStatus = async (sessionId: string): Promise<GenerationStatus | null> => {
   const fullUrl = `${STATUS_API_URL}?sessionId=${encodeURIComponent(sessionId)}`;
   const url = new URL(fullUrl);
 
@@ -72,8 +85,7 @@ export const checkStatus = async (sessionId: string): Promise<string | null> => 
     return null;
   }
 
-  const data = await response.json();
-  return data.url ?? null;
+  return await response.json();
 };
 export const generateSessionId = (): string =>
   `web-${Math.random().toString(36).substring(2, 10)}`;
